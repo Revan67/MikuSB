@@ -155,7 +155,7 @@ public class RouteController : ControllerBase
                 playerFillAgeUrl = "",
                 status = 0,
                 thirdPartyUid = "",
-                finalToken,
+                token = finalToken,
                 type = "google",
                 uid = finalUid
             },
@@ -210,15 +210,25 @@ public class RouteController : ControllerBase
     [HttpGet("/query")]
     public IActionResult GetQuery([FromQuery] string? version, [FromQuery] string? platform)
     {
-        object rsp = new
+        var servers = new[]
         {
-            platform,
-            version,
-            host = Config.GameServer.PublicAddress,
-            port = Config.GameServer.Port
+            new
+            {
+                id = 1,
+                server_id = 1,
+                name = Config.GameServer.GameServerName,
+                title = Config.GameServer.GameServerName,
+                host = Config.GameServer.PublicAddress,
+                ip = Config.GameServer.PublicAddress,
+                port = Config.GameServer.Port,
+                status = 1,
+                state = 1,
+                is_open = true,
+                open = true,
+                recommend = true
+            }
         };
-
-        return Ok(rsp);
+        return Ok(servers);
     }
 
     [HttpGet("/query_version={version}")]
