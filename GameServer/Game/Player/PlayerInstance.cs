@@ -142,6 +142,7 @@ public class PlayerInstance(PlayerGameData data)
             Name = Data.Name,
             Level = Data.Level,
             Sex = Data.Gender,
+            Vigor = 240,
             Solutions =
             {
                 new Lineup // TODO Lineup Manager
@@ -155,8 +156,8 @@ public class PlayerInstance(PlayerGameData data)
             },
         };
 
-        foreach(var weapon in InventoryManager.InventoryData.Weapons.Values) proto.Items.Add(weapon.ToProto());
-        foreach (var skin in InventoryManager.InventoryData.Skins.Values) proto.Items.Add(skin.ToProto());
+        //foreach(var weapon in InventoryManager.InventoryData.Weapons.Values) proto.Items.Add(weapon.ToProto());
+        //foreach (var skin in InventoryManager.InventoryData.Skins.Values) proto.Items.Add(skin.ToProto());
         foreach (var chara in CharacterManager.CharacterData.Characters) proto.Items.Add(chara.ToProto());
 
         foreach (var x in Data.Attrs)
@@ -228,13 +229,25 @@ public class PlayerInstance(PlayerGameData data)
         // Launch.GPASSID = 22 stores pass counts. ChapterLevel.GID = 21 stores star flags.
         // Completing the prologue/early chapter range prevents function conditions from
         // treating the account as a fresh tutorial player.
-        for (uint levelId = 10_000; levelId <= 10_160; levelId++)
+        for (uint levelId = 10_000; levelId <= 11_007; levelId++)
         {
             yield return (21, levelId, 7);
             yield return (22, levelId, 1);
         }
 
-        foreach (var levelId in new uint[] { 10_121, 10_122, 10_123, 50_000, 50_151 })
+        for (uint levelId = 12_001; levelId <= 12_075; levelId++)
+        {
+            yield return (21, levelId, 7);
+            yield return (22, levelId, 1);
+        }
+
+        for (uint levelId = 13_002; levelId <= 13_081; levelId++)
+        {
+            yield return (21, levelId, 7);
+            yield return (22, levelId, 1);
+        }
+
+        foreach (var levelId in new uint[] { 11_315, 11_311, 11_313, 11_322, 11_331, 11_333, 10_123, 50_000, 50_151 })
         {
             yield return (21, levelId, 7);
             yield return (22, levelId, 1);
