@@ -42,6 +42,5 @@ public static class CallGSRouter
     {
         var rsp = new NtfCallScript { Api = api, Arg = arg, ExtraSync = extra };
         await connection.SendPacket(CmdIds.NtfScript, rsp);
-        await connection.SendPacket(CmdIds.RspCallGS);
     }
 }
