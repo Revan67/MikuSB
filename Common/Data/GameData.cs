@@ -8,6 +8,7 @@ public static class GameData
     public static Dictionary<uint, WeaponExcel> WeaponData { get; private set; } = [];
     public static Dictionary<uint, CardSkinExcel> CardSkinData { get; private set; } = [];
     public static Dictionary<uint, SuppliesExcel> SuppliesData { get; private set; } = [];
+    public static List<SuppliesExcel> AllSuppliesData { get; private set; } = [];
     public static Dictionary<int, UpgradeExpExcel> UpgradeExpData { get; private set; } = [];
     public static Dictionary<int, BreakLevelLimitExcel> BreakLevelLimitData { get; private set; } = [];
     public static Dictionary<int, RecycleExcel> RecycleData { get; private set; } = [];

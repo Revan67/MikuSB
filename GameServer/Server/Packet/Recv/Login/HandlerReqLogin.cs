@@ -3,6 +3,7 @@ using MikuSB.Database;
 using MikuSB.Database.Account;
 using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
+using MikuSB.GameServer.Server.CallGS;
 using MikuSB.GameServer.Server.Packet.Send.Friend;
 using MikuSB.GameServer.Server.Packet.Send.Login;
 using MikuSB.Proto;
@@ -47,6 +48,13 @@ public class HandlerReqLogin : Handler
         await connection.Player.OnEnterGame();
         connection.Player.Connection = connection;
         await connection.SendPacket(new PacketRspLogin(connection.Player!));
+
+        var supplySync = new MikuSB.Proto.NtfSyncPlayer();
+        foreach (var item in connection.Player.GetSupplyItems())
+            supplySync.Items.Add(item.ToProto());
+        if (supplySync.Items.Count > 0)
+            await CallGSRouter.SendScript(connection, "", "{}", supplySync);
+
         await connection.Player.OnHeartBeat();
         await connection.SendPacket(new PacketNtfUpdateFriend(connection.Player!));
     }

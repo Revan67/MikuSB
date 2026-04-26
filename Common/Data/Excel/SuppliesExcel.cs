@@ -28,6 +28,7 @@ public class SuppliesExcel : ExcelResource
     public override void Loaded()
     {
         GameData.SuppliesData[GetId()] = this;
+        GameData.AllSuppliesData.Add(this);
     }
 
     private static int ReadInt(JToken? token)

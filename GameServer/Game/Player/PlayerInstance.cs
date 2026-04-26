@@ -2,6 +2,7 @@
 using MikuSB.Data;
 using MikuSB.Database;
 using MikuSB.Database.Account;
+using MikuSB.Database.Inventory;
 using MikuSB.Database.Player;
 using MikuSB.Enums.Item;
 using MikuSB.GameServer.Command;
@@ -69,7 +70,7 @@ public class PlayerInstance(PlayerGameData data)
             {
                 await CharacterManager.AddCharacter((ItemTypeEnum)card.Genre, card.Detail, card.Particular, card.Level);
             }
-            foreach (var supplies in GameData.SuppliesData.Values)
+            foreach (var supplies in GameData.AllSuppliesData)
             {
                 await InventoryManager.AddSuppliesItem(supplies, 90000);
             }
@@ -138,6 +139,18 @@ public class PlayerInstance(PlayerGameData data)
     {
         if (!Initialized) await InitialPlayerManager();
         await CharacterManager.RepairCharacterWeapons();
+        await EnsureSupplies();
+    }
+
+    public IEnumerable<BaseGameItemInfo> GetSupplyItems() =>
+        InventoryManager.InventoryData.Items.Values.Where(x => (x.TemplateId & 0xFFFF) == 5);
+
+    private async ValueTask EnsureSupplies()
+    {
+        foreach (var supplies in GameData.AllSuppliesData)
+        {
+            await InventoryManager.AddSuppliesItem(supplies, 90000);
+        }
     }
 
     public async ValueTask OnLogin()
@@ -228,7 +241,8 @@ public class PlayerInstance(PlayerGameData data)
             Solutions = { LineupManager.LineupData.LineupInfo.Values.Select(x => x.ToProto()) },
         };
 
-        foreach (var item in InventoryManager.InventoryData.Items.Values) proto.Items.Add(item.ToProto());
+        foreach (var item in InventoryManager.InventoryData.Items.Values)
+            if ((item.TemplateId & 0xFFFF) != 5) proto.Items.Add(item.ToProto());
         foreach (var weapon in InventoryManager.InventoryData.Weapons.Values) proto.Items.Add(weapon.ToProto());
         foreach (var skin in InventoryManager.InventoryData.Skins.Values) proto.Items.Add(skin.ToProto());
         foreach (var chara in CharacterManager.CharacterData.Characters) proto.Items.Add(chara.ToProto());

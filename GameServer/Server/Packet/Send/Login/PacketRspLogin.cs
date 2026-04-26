@@ -1,12 +1,15 @@
 using MikuSB.GameServer.Game.Player;
 using MikuSB.TcpSharp;
 using MikuSB.Proto;
+using MikuSB.Util;
 using MikuSB.Util.Extensions;
 
 namespace MikuSB.GameServer.Server.Packet.Send.Login;
 
 public class PacketRspLogin : BasePacket
 {
+    private static readonly Logger Logger = new("RspLogin");
+
     public PacketRspLogin(PlayerInstance player) : base(CmdIds.RspLogin)
     {
         var proto = new RspLogin
@@ -18,6 +21,9 @@ public class PacketRspLogin : BasePacket
             NeedRename = false
         };
 
-        SetData(proto);
+        var bytes = Google.Protobuf.MessageExtensions.ToByteArray(proto);
+        Logger.Info($"RspLogin proto size: {bytes.Length} bytes (limit: 65535)");
+
+        SetData(bytes);
     }
 }

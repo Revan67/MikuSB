@@ -138,11 +138,14 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
         return InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == templateId);
     }
 
+    private static uint GetSuppliesMaxCount(SuppliesExcel suppliesData) =>
+        suppliesData.Genre == 5 && suppliesData.Detail == 4 ? 999999u : 99999u;
+
     public async ValueTask<BaseGameItemInfo?> AddSuppliesItem(SuppliesExcel suppliesData, uint count)
     {
         var templateId = GameResourceTemplateId.FromGdpl(suppliesData.Genre, suppliesData.Detail, suppliesData.Particular, suppliesData.Level);
 
-        uint maxCount = suppliesData.GMnum > 0 ? suppliesData.GMnum : 99999;
+        uint maxCount = GetSuppliesMaxCount(suppliesData);
         uint giveCount = Math.Min(count, maxCount);
 
         var existing = InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == templateId);
