@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MikuSB.Util;
@@ -16,6 +17,13 @@ public static class UpdateService
     private static readonly string RepositoryName = "MikuSB";
     private static readonly string AssetName = "MikuSB-win-x64.zip";
     private static readonly int TimeoutSeconds = 5;
+    private static readonly string ResourceArchiveUrl =
+        "https://github.com/Kei-Luna/MikuSB-Resource/archive/refs/heads/main.zip";
+    private static readonly string[] RequiredResourceFiles =
+    [
+        "card.json",
+        "weapon.json"
+    ];
 
     public static async Task<bool> TryStartSelfUpdateAsync()
     {
@@ -72,6 +80,10 @@ public static class UpdateService
             Logger.Info($"Downloading update {release.TagName}.");
             await DownloadFileAsync(client, asset.DownloadUrl, packagePath, cts.Token);
 
+            var resourcePackagePath = Path.Combine(tempRoot, "MikuSB-Resource-main.zip");
+            Logger.Info("Downloading resource package.");
+            await DownloadFileAsync(client, ResourceArchiveUrl, resourcePackagePath, cts.Token);
+
             var checksumAsset = release.Assets.FirstOrDefault(x =>
                 string.Equals(x.Name, AssetName + ".sha256", StringComparison.OrdinalIgnoreCase));
             if (checksumAsset != null)
@@ -90,7 +102,9 @@ public static class UpdateService
                 ArgumentList =
                 {
                     "--package", packagePath,
+                    "--resource-package", resourcePackagePath,
                     "--target", AppContext.BaseDirectory,
+                    "--resource-target", Path.Combine(AppContext.BaseDirectory, ConfigManager.Config.Path.ResourcePath),
                     "--restart", Path.Combine(AppContext.BaseDirectory, "MikuSB.exe"),
                     "--pid", Environment.ProcessId.ToString()
                 }
@@ -112,6 +126,15 @@ public static class UpdateService
         }
     }
 
+    public static async Task EnsureResourcesPresentAsync()
+    {
+        if (!AreRequiredResourcesPresent())
+        {
+            Logger.Warn("Required resources are missing. Downloading resource package.");
+            await DownloadAndInstallResourcesAsync();
+        }
+    }
+
     private static string StageUpdaterExecutable()
     {
         var sourceDirectory = AppContext.BaseDirectory;
@@ -129,6 +152,45 @@ public static class UpdateService
             throw new FileNotFoundException("Failed to stage MikuSB.Updater.exe.", stagedUpdaterPath);
 
         return stagedUpdaterPath;
+    }
+
+    private static bool AreRequiredResourcesPresent()
+    {
+        var excelOutputPath = Path.Combine(AppContext.BaseDirectory, ConfigManager.Config.Path.ResourcePath, "ExcelOutput");
+        if (!Directory.Exists(excelOutputPath))
+            return false;
+
+        return RequiredResourceFiles.All(fileName => File.Exists(Path.Combine(excelOutputPath, fileName)));
+    }
+
+    private static async Task DownloadAndInstallResourcesAsync()
+    {
+        using var client = CreateHttpClient();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, TimeoutSeconds)));
+        var tempRoot = Path.Combine(Path.GetTempPath(), "MikuSB", "resources", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        var resourcePackagePath = Path.Combine(tempRoot, "MikuSB-Resource-main.zip");
+        await DownloadFileAsync(client, ResourceArchiveUrl, resourcePackagePath, cts.Token);
+        InstallResourcesFromArchive(resourcePackagePath,
+            Path.Combine(AppContext.BaseDirectory, ConfigManager.Config.Path.ResourcePath));
+    }
+
+    private static void InstallResourcesFromArchive(string resourcePackagePath, string resourceTargetDirectory)
+    {
+        var resourceStagingDirectory = Path.Combine(Path.GetTempPath(), "MikuSB", "resource-staging", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(resourceStagingDirectory);
+
+        ZipFile.ExtractToDirectory(resourcePackagePath, resourceStagingDirectory, overwriteFiles: true);
+
+        var extractedRoot = Directory.GetDirectories(resourceStagingDirectory).FirstOrDefault() ?? resourceStagingDirectory;
+        var excelOutputSource = Path.Combine(extractedRoot, "ExcelOutput");
+        if (!Directory.Exists(excelOutputSource))
+            throw new DirectoryNotFoundException($"ExcelOutput directory was not found in resource package: {excelOutputSource}");
+
+        var excelOutputTarget = Path.Combine(resourceTargetDirectory, "ExcelOutput");
+        Directory.CreateDirectory(excelOutputTarget);
+        CopyDirectory(excelOutputSource, excelOutputTarget);
     }
 
     private static bool ConfirmUpdate(string latestVersion)
@@ -197,6 +259,23 @@ public static class UpdateService
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var destination = File.Create(destinationPath);
         await source.CopyToAsync(destination, cancellationToken);
+    }
+
+    private static void CopyDirectory(string sourceDirectory, string targetDirectory)
+    {
+        foreach (var directory in Directory.GetDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, directory);
+            Directory.CreateDirectory(Path.Combine(targetDirectory, relativePath));
+        }
+
+        foreach (var file in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, file);
+            var destinationPath = Path.Combine(targetDirectory, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            File.Copy(file, destinationPath, overwrite: true);
+        }
     }
 
     private static void VerifySha256(string packagePath, string checksumPath)

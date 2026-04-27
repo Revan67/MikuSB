@@ -11,6 +11,8 @@ if (!argsMap.TryGetValue("--package", out var packagePath)
 }
 
 argsMap.TryGetValue("--pid", out var pidValue);
+argsMap.TryGetValue("--resource-package", out var resourcePackagePath);
+argsMap.TryGetValue("--resource-target", out var resourceTargetDirectory);
 
 try
 {
@@ -22,6 +24,9 @@ try
 
     ZipFile.ExtractToDirectory(packagePath, stagingDirectory, overwriteFiles: true);
     CopyDirectory(stagingDirectory, targetDirectory);
+
+    if (!string.IsNullOrWhiteSpace(resourcePackagePath) && !string.IsNullOrWhiteSpace(resourceTargetDirectory))
+        UpdateResources(resourcePackagePath, resourceTargetDirectory);
 
     Process.Start(new ProcessStartInfo
     {
@@ -87,4 +92,21 @@ static void CopyDirectory(string sourceDirectory, string targetDirectory)
 static bool ShouldSkip(string relativePath)
 {
     return relativePath.StartsWith("Config", StringComparison.OrdinalIgnoreCase);
+}
+
+static void UpdateResources(string resourcePackagePath, string resourceTargetDirectory)
+{
+    var resourceStagingDirectory = Path.Combine(Path.GetTempPath(), "MikuSB", "resource-staging", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(resourceStagingDirectory);
+
+    ZipFile.ExtractToDirectory(resourcePackagePath, resourceStagingDirectory, overwriteFiles: true);
+
+    var extractedRoot = Directory.GetDirectories(resourceStagingDirectory).FirstOrDefault() ?? resourceStagingDirectory;
+    var excelOutputSource = Path.Combine(extractedRoot, "ExcelOutput");
+    if (!Directory.Exists(excelOutputSource))
+        throw new DirectoryNotFoundException($"ExcelOutput directory was not found in resource package: {excelOutputSource}");
+
+    var excelOutputTarget = Path.Combine(resourceTargetDirectory, "ExcelOutput");
+    Directory.CreateDirectory(excelOutputTarget);
+    CopyDirectory(excelOutputSource, excelOutputTarget);
 }
