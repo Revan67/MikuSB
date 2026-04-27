@@ -16,7 +16,10 @@ public static class UpdateService
     private static readonly string RepositoryOwner = "MikuLeaks";
     private static readonly string RepositoryName = "MikuSB";
     private static readonly string AssetName = "MikuSB-win-x64.zip";
-    private static readonly int TimeoutSeconds = 5;
+    private static readonly int ReleaseCheckTimeoutSeconds = 10;
+    private static readonly int PackageDownloadTimeoutSeconds = 300;
+    private static readonly int ResourceDownloadTimeoutSeconds = 300;
+    private static readonly int ChecksumDownloadTimeoutSeconds = 30;
     private static readonly string ResourceArchiveUrl =
         "https://github.com/Kei-Luna/MikuSB-Resource/archive/refs/heads/main.zip";
     private static readonly string[] RequiredResourceFiles =
@@ -50,8 +53,9 @@ public static class UpdateService
             Logger.Info($"Current build version: {BuildVersion.Current}");
 
             using var client = CreateHttpClient();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, TimeoutSeconds)));
-            var release = await GetLatestReleaseAsync(client, cts.Token);
+            using var releaseCts =
+                new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, ReleaseCheckTimeoutSeconds)));
+            var release = await GetLatestReleaseAsync(client, releaseCts.Token);
             if (release == null)
                 return false;
 
@@ -78,18 +82,18 @@ public static class UpdateService
 
             var packagePath = Path.Combine(tempRoot, asset.Name);
             Logger.Info($"Downloading update {release.TagName}.");
-            await DownloadFileAsync(client, asset.DownloadUrl, packagePath, cts.Token);
+            await DownloadFileAsync(client, asset.DownloadUrl, packagePath, PackageDownloadTimeoutSeconds);
 
             var resourcePackagePath = Path.Combine(tempRoot, "MikuSB-Resource-main.zip");
             Logger.Info("Downloading resource package.");
-            await DownloadFileAsync(client, ResourceArchiveUrl, resourcePackagePath, cts.Token);
+            await DownloadFileAsync(client, ResourceArchiveUrl, resourcePackagePath, ResourceDownloadTimeoutSeconds);
 
             var checksumAsset = release.Assets.FirstOrDefault(x =>
                 string.Equals(x.Name, AssetName + ".sha256", StringComparison.OrdinalIgnoreCase));
             if (checksumAsset != null)
             {
                 var checksumPath = Path.Combine(tempRoot, checksumAsset.Name);
-                await DownloadFileAsync(client, checksumAsset.DownloadUrl, checksumPath, cts.Token);
+                await DownloadFileAsync(client, checksumAsset.DownloadUrl, checksumPath, ChecksumDownloadTimeoutSeconds);
                 VerifySha256(packagePath, checksumPath);
             }
 
@@ -166,12 +170,11 @@ public static class UpdateService
     private static async Task DownloadAndInstallResourcesAsync()
     {
         using var client = CreateHttpClient();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, TimeoutSeconds)));
         var tempRoot = Path.Combine(Path.GetTempPath(), "MikuSB", "resources", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempRoot);
 
         var resourcePackagePath = Path.Combine(tempRoot, "MikuSB-Resource-main.zip");
-        await DownloadFileAsync(client, ResourceArchiveUrl, resourcePackagePath, cts.Token);
+        await DownloadFileAsync(client, ResourceArchiveUrl, resourcePackagePath, ResourceDownloadTimeoutSeconds);
         InstallResourcesFromArchive(resourcePackagePath,
             Path.Combine(AppContext.BaseDirectory, ConfigManager.Config.Path.ResourcePath));
     }
@@ -214,7 +217,7 @@ public static class UpdateService
     {
         var client = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(Math.Max(1, TimeoutSeconds))
+            Timeout = Timeout.InfiniteTimeSpan
         };
 
         client.DefaultRequestHeaders.UserAgent.Add(
@@ -251,14 +254,15 @@ public static class UpdateService
         HttpClient client,
         string downloadUrl,
         string destinationPath,
-        CancellationToken cancellationToken)
+        int timeoutSeconds)
     {
-        using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, timeoutSeconds)));
+        using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
 
-        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var source = await response.Content.ReadAsStreamAsync(cts.Token);
         await using var destination = File.Create(destinationPath);
-        await source.CopyToAsync(destination, cancellationToken);
+        await source.CopyToAsync(destination, cts.Token);
     }
 
     private static void CopyDirectory(string sourceDirectory, string targetDirectory)
