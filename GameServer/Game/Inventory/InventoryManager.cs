@@ -24,7 +24,7 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
             TemplateId = templateId,
             UniqueId = InventoryData.NextUniqueUid++,
             Level = weaponLevel,
-            Break = weaponData.InitBreak,
+            Break = GetWeaponBreak(weaponLevel),
             ItemType = ItemTypeEnum.TYPE_WEAPON,
             ItemCount = 1
         };
@@ -33,6 +33,17 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
         if (sendPacket) await Player.SendPacket(new PacketNtfCallScript([weaponInfo]));
 
         return weaponInfo;
+    }
+
+    private static uint GetWeaponBreak(uint level)
+    {
+        if (level <= 20) return 1;
+        if (level <= 40) return 2;
+        if (level <= 60) return 3;
+        if (level <= 70) return 4;
+        if (level <= 80) return 5;
+        if (level <= 90) return 6;
+        return 7;
     }
 
     public GameWeaponInfo? GetWeaponItem(uint uniqueId)

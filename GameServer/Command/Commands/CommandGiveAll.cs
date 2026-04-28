@@ -18,7 +18,7 @@ public class CommandGiveAll : ICommands
         if (await arg.GetOption('l') is not int level) return;
 
         var detail = arg.GetInt(0);
-        level = Math.Clamp(level, 1, 80);
+        level = Math.Clamp(level, 1, 90);
         var player = arg.Target!.Player!;
         List<GameWeaponInfo> weapons = [];
         if (detail == -1)
