@@ -28,6 +28,8 @@ public class CharacterInfo
     [SugarColumn(IsJson = true)] public List<uint> UnlockedSkin { get; set; } = [];
     [SugarColumn(IsJson = true)] public List<uint> Spines { get; set; } = [];
     [SugarColumn(IsJson = true)] public List<uint> Affixs { get; set; } = [];
+    // Key = EqSlot (= support card Detail), Value = support card UniqueId
+    [SugarColumn(IsJson = true)] public Dictionary<uint, uint> SupportSlots { get; set; } = [];
     public long Timestamp { get; set; }
     public uint Count { get; set; } = 1;
 
@@ -55,6 +57,8 @@ public class CharacterInfo
 
         proto.Slots[4] = WeaponUniqueId;
         proto.Slots[5] = SkinId;
+        foreach (var (slot, uid) in SupportSlots)
+            proto.Slots[slot] = uid;
 
         return proto;
     }
