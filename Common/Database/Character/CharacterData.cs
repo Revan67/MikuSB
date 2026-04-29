@@ -29,8 +29,7 @@ public class CharacterInfo
     [SugarColumn(IsJson = true)] public List<uint> UnlockedSkin { get; set; } = [];
     [SugarColumn(IsJson = true)] public List<uint> Spines { get; set; } = [];
     [SugarColumn(IsJson = true)] public List<uint> Affixs { get; set; } = [];
-    // Key = EqSlot (= support card Detail), Value = support card UniqueId
-    [SugarColumn(IsJson = true)] public Dictionary<uint, uint> SupportSlots { get; set; } = [];
+    [SugarColumn(IsJson = true)] public Dictionary<uint, uint> SupportSlots { get; set; } = []; // Key = EqSlot (= support card Detail), Value = support card UniqueId
     public long Timestamp { get; set; }
     public uint Count { get; set; } = 1;
 
@@ -56,9 +55,9 @@ public class CharacterInfo
         proto.Enhance.Spines.AddRange(Spines.Select(x => (ulong)x));
         proto.Enhance.Affixs.AddRange(Affixs);
 
-        proto.Slots[4] = WeaponUniqueId;
-        proto.Slots[5] = SkinId;
-        proto.Slots[6] = WeaponSkinId;
+        proto.Slots[(uint)ItemCardSlotTypeEnum.SLOT_WEAPON] = WeaponUniqueId;
+        proto.Slots[(uint)ItemCardSlotTypeEnum.SLOT_SKIN] = SkinId;
+        proto.Slots[(uint)ItemCardSlotTypeEnum.SLOT_WEAPON_SKIN] = WeaponSkinId;
         foreach (var (slot, uid) in SupportSlots)
             proto.Slots[slot] = uid;
 

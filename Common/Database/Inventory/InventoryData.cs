@@ -93,7 +93,7 @@ public class GameSkinInfo : BaseGameItemInfo
             Count = ItemCount,
             Flag = (uint)Flag,
         };
-        proto.Slots[11] = Math.Min(SkinType, 1);
+        proto.Slots[(uint)ItemSkinSlotTypeEnum.SLOT_CARD_SKIL_TYPE] = Math.Min(SkinType, 1);
         return proto;
     }
 }
@@ -116,7 +116,7 @@ public class GameSupportCardInfo : BaseGameItemInfo
                 Exp = Exp
             }
         };
-        proto.Slots[1] = AffixId;
+        proto.Slots[(uint)ItemSupportCardSlotTypeEnum.SLOT_AFFIXINDEX] = AffixId;
         return proto;
     }
 }
