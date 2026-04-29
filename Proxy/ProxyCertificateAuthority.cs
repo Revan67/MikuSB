@@ -85,6 +85,9 @@ public sealed class ProxyCertificateAuthority
         File.WriteAllBytes(pfxPath, exportable.Export(X509ContentType.Pfx, Password));
         File.WriteAllBytes(RootCerPath, exportable.Export(X509ContentType.Cert));
         _logger.LogInformation("Created MikuSB proxy root certificate at {CertificatePath}", RootCerPath);
+
+        File.WriteAllText(RootCerPemPath, exportable.ExportCertificatePem());
+        _logger.LogInformation("Created MikuSB proxy root certificate (PEM) at {CertificatePath}", RootCerPemPath);
         return exportable;
     }
 
