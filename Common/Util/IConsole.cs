@@ -53,7 +53,7 @@ public class IConsole
         Console.WriteLine();
         Input = [];
         CursorIndex = 0;
-        if (InputHistory.Count >= HistoryMaxCount) 
+        if (InputHistory.Count >= HistoryMaxCount)
             InputHistory.RemoveAt(0);
         InputHistory.Add(input);
         HistoryIndex = InputHistory.Count;
@@ -80,7 +80,7 @@ public class IConsole
     public static void HandleUpArrow()
     {
         if (InputHistory.Count == 0) return;
-        
+
         if (HistoryIndex > 0)
         {
             HistoryIndex--;
@@ -94,7 +94,7 @@ public class IConsole
     public static void HandleDownArrow()
     {
         if (HistoryIndex >= InputHistory.Count) return;
-        
+
         HistoryIndex++;
         if (HistoryIndex >= InputHistory.Count)
         {
@@ -102,7 +102,7 @@ public class IConsole
             Input = [];
             CursorIndex = 0;
         }
-        else 
+        else
         {
             var history = InputHistory[HistoryIndex];
             Input = [.. history];
@@ -114,7 +114,7 @@ public class IConsole
     public static void HandleLeftArrow()
     {
         if (CursorIndex <= 0) return;
-        
+
         var (left, _) = Console.GetCursorPosition();
         CursorIndex--;
         Console.SetCursorPosition(left - GetWidth(Input[CursorIndex].ToString()), Console.CursorTop);
@@ -123,7 +123,7 @@ public class IConsole
     public static void HandleRightArrow()
     {
         if (CursorIndex >= Input.Count) return;
-        
+
         var (left, _) = Console.GetCursorPosition();
         CursorIndex++;
         Console.SetCursorPosition(left + GetWidth(Input[CursorIndex - 1].ToString()), Console.CursorTop);
@@ -148,13 +148,29 @@ public class IConsole
 
     #endregion
 
-    public static string ListenConsole()
+    public static async Task ListenConsole(CancellationToken exitToken)
     {
-        while (true)
+        while (!exitToken.IsCancellationRequested)
         {
             ConsoleKeyInfo keyInfo;
-            try { keyInfo = Console.ReadKey(true); }
-            catch (InvalidOperationException) { continue; }
+            try
+            {
+                if (!Console.KeyAvailable)
+                {
+                    await Task.Delay(10, exitToken);
+                    continue;
+                }
+                keyInfo = Console.ReadKey(true);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (InvalidOperationException)
+            {
+                await Task.Delay(50, exitToken);
+                continue;
+            }
 
             switch (keyInfo.Key)
             {

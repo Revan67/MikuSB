@@ -160,7 +160,7 @@ public class LoaderManager : MikuSB
         }
     }
 
-    public static void InitCommand()
+    public static async Task InitCommand(CancellationToken exitToken)
     {
         // Register the command handlers
         try
@@ -178,6 +178,6 @@ public class LoaderManager : MikuSB
         IConsole.OnConsoleExcuteCommand += CommandExecutor.ConsoleExcuteCommand;
         CommandExecutor.OnRunCommand += (sender, e) => { CommandManager.HandleCommand(e, sender); };
 
-        IConsole.ListenConsole();
+        await IConsole.ListenConsole(exitToken);
     }
 }

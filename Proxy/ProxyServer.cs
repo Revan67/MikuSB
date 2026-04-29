@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Text;
 using MikuSB.Configuration;
+using MikuSB.Util;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,7 +16,7 @@ public sealed class ProxyServer(
     IOptions<ProxyOptions> options,
     ProxyCertificateAuthority certificateAuthority,
     HttpClient httpClient,
-    ILogger<ProxyServer> logger) : BackgroundService
+    Logger logger) : BackgroundService
 {
     private const string ListenAddress = "127.0.0.1";
     private const string ServerHost = "127.0.0.1";
@@ -53,14 +54,14 @@ public sealed class ProxyServer(
     {
         if (!_options.Enabled)
         {
-            logger.LogInformation("MikuSB proxy is disabled");
+            logger.Info("MikuSB proxy is disabled");
             return;
         }
 
         var address = IPAddress.Parse(ListenAddress);
         _listener = new TcpListener(address, _options.Port);
         _listener.Start();
-        logger.LogInformation("MikuSB proxy listening on {Address}:{Port}", ListenAddress, _options.Port);
+        logger.Info($"MikuSB proxy listening on {ListenAddress}:{_options.Port}");
 
         try
         {
@@ -85,6 +86,7 @@ public sealed class ProxyServer(
     {
         using (client)
         {
+            logger.Info($"Proxy New client: {client.Client.RemoteEndPoint}");
             try
             {
                 await HandleClientCoreAsync(client, cancellationToken);
@@ -100,12 +102,13 @@ public sealed class ProxyServer(
             }
             catch (AuthenticationException ex)
             {
-                logger.LogWarning(ex, "Proxy TLS authentication failed");
+                logger.Warn($"Proxy TLS authentication failed: {ex}");
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Proxy client failed");
+                logger.Warn($"Proxy client failed {ex}");
             }
+            logger.Info($"Proxy client close: {client.Client.RemoteEndPoint}");
         }
     }
 
@@ -187,7 +190,7 @@ public sealed class ProxyServer(
     {
         var pathAndQuery = request.GetPathAndQuery();
         var uri = new Uri($"http://{ServerHost}:{_options.ServerHttpPort}{pathAndQuery}");
-        logger.LogInformation("[Proxy] Redirect: {Method} {Host}{Path} -> {Uri}", request.Method, request.HostOverride ?? request.Host, pathAndQuery, uri);
+        logger.Info($"Redirect: {request.Method} {request.HostOverride ?? request.Host}{pathAndQuery} -> {uri}");
         await SendHttpRequestAsync(clientStream, request, uri, true, cancellationToken);
     }
 
@@ -202,7 +205,7 @@ public sealed class ProxyServer(
 
         if (IsSelfReference(uri))
         {
-            logger.LogWarning("[Proxy] Self-reference blocked: {Method} {Uri}", request.Method, uri);
+            logger.Info($"Self-reference blocked: {request.Method} {uri}");
             await WriteSimpleResponseAsync(clientStream, HttpStatusCode.LoopDetected, "Proxy self-reference detected", cancellationToken);
             return;
         }
@@ -351,7 +354,10 @@ public sealed class ProxyServer(
 
         public string GetPathAndQuery()
         {
-            if (Uri.TryCreate(Target, UriKind.Absolute, out var uri))
+            // "/query?version=a.b.c&platform=PC"
+            // => Uri.TryCreate() return true && uri.Scheme == "file"
+            // => will return "/query%3Fversion=a.b.c&platform=PC" cause 404
+            if (Uri.TryCreate(Target, UriKind.Absolute, out var uri) && uri.IsAbsoluteUri && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                 return uri.PathAndQuery;
 
             if (string.IsNullOrEmpty(Target))

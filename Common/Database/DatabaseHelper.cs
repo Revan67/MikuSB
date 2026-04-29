@@ -14,7 +14,10 @@ public class DatabaseHelper
     public static readonly ConcurrentDictionary<int, List<BaseDatabaseDataHelper>> UidInstanceMap = [];
     public static readonly List<int> ToSaveUidList = [];
     public static long LastSaveTick = DateTime.UtcNow.Ticks;
-    public static Thread? SaveThread;
+
+    private static int _saving = 0;
+    private static Task? _saveTask;
+    private static CancellationTokenSource? _cts;
     public static bool LoadAccount;
     public static bool LoadAllData;
 
@@ -77,15 +80,11 @@ public class DatabaseHelper
 
         while (!res.IsCompleted)
         {
+            Thread.Sleep(100);
         }
 
-        LastSaveTick = DateTime.UtcNow.Ticks;
-
-        SaveThread = new Thread(() =>
-        {
-            while (true) CalcSaveDatabase();
-        });
-        SaveThread.Start();
+        _cts = new CancellationTokenSource();
+        _saveTask = RunAutoSave(_cts.Token);
 
         LoadAllData = true;
     }
@@ -248,6 +247,35 @@ public class DatabaseHelper
             ToSaveUidList.RemoveAll(x => x == key);
     }
 
+    public static void Stop()
+    {
+        _cts?.Cancel();
+    }
+
+    public static async Task WaitAsync()
+    {
+        if (_saveTask != null)
+            await _saveTask;
+    }
+
+    private static async Task RunAutoSave(CancellationToken token)
+    {
+        LastSaveTick = DateTime.UtcNow.Ticks;
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                CalcSaveDatabase();
+                await Task.Delay(100, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // exit normally
+            // Console.WriteLine($"RunAutoSave exit! - OperationCanceledException");
+        }
+    }
+
     // Auto save per 5 min
     public static void CalcSaveDatabase()
     {
@@ -257,6 +285,10 @@ public class DatabaseHelper
 
     public static void SaveDatabase()
     {
+        // ensure only one SaveDatabase() runnig
+        if (Interlocked.Exchange(ref _saving, 1) == 1)
+            return;
+
         try
         {
             var prev = DateTime.Now;
@@ -281,10 +313,17 @@ public class DatabaseHelper
                 Math.Round(t, 2).ToString(CultureInfo.InvariantCulture)));
 
             ToSaveUidList.Clear();
+
+            // Thread.Sleep(5000); // for test if saving process taking too long
         }
         catch (Exception e)
         {
             logger.Error("An error occurred while saving the database", e);
+        }
+        finally
+        {
+            // release lock
+            Volatile.Write(ref _saving, 0);
         }
 
         LastSaveTick = DateTime.UtcNow.Ticks;

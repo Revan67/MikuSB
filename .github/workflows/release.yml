@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
 jobs:
   build-release:
     runs-on: windows-latest
@@ -18,7 +21,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - name: Read version
         id: version
@@ -54,3 +57,55 @@ jobs:
           files: |
             artifacts/MikuSB-win-x64.zip
             artifacts/MikuSB-win-x64.zip.sha256
+
+  build-release-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish server
+        run: |
+          dotnet publish ./MikuSB/MikuSB.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true --property:PublishDir=../artifacts/dist
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          line=$(head -n 1 version.txt | xargs)
+          VERSION=${line#v=}
+
+          SHORT_HASH="$(git rev-parse --short=7 HEAD)"
+          if [ -z "$VERSION" ]; then
+            echo "version.txt is empty."
+            VERSION=${SHORT_HASH}
+          fi
+          if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
+            echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          else
+            SAFE_NAME=$(echo "${{ env.BRANCH_NAME }}" | tr '/' '-')
+            echo "tag=${SAFE_NAME}-v${VERSION}-${SHORT_HASH}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Assemble release package
+        run: |
+          packageDir="./artifacts/dist/"
+          zipFile="MikuSB-linux-x64.zip"
+          cp ./version.txt ${packageDir}
+          pushd ${packageDir}
+          zip -r ../${zipFile} .
+          popd
+          sha256sum ./artifacts/${zipFile} > ./artifacts/${zipFile}.sha256
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            ./artifacts/MikuSB-linux-x64.zip
+            ./artifacts/MikuSB-linux-x64.zip.sha256
